@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Search, Phone, Mail, Calendar, TrendingUp, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,68 +10,52 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { supabase } from "@/integrations/supabase/client";
 
-const leads = [
-  {
-    id: 1,
-    name: "Elena Jiménez",
-    company: "FutureTech",
-    email: "elena@futuretech.com",
-    phone: "+34 611 234 567",
-    source: "Web",
-    status: "nuevo",
-    score: 85,
-    value: "€25,000",
-    created: "2024-01-15",
-    nextAction: "Llamar mañana"
-  },
-  {
-    id: 2,
-    name: "Roberto Silva",
-    company: "Growth Co.",
-    email: "roberto@growthco.es",
-    phone: "+34 622 345 678",
-    source: "Referido",
-    status: "contactado",
-    score: 92,
-    value: "€18,000",
-    created: "2024-01-12",
-    nextAction: "Enviar propuesta"
-  },
-  {
-    id: 3,
-    name: "Sofia Herrera",
-    company: "NextGen Solutions",
-    email: "sofia@nextgen.com",
-    phone: "+34 633 456 789",
-    source: "LinkedIn",
-    status: "calificado",
-    score: 78,
-    value: "€35,000",
-    created: "2024-01-10",
-    nextAction: "Agendar demo"
-  },
-  {
-    id: 4,
-    name: "Miguel Torres",
-    company: "Innovate Plus",
-    email: "miguel@innovateplus.es",
-    phone: "+34 644 567 890",
-    source: "Evento",
-    status: "perdido",
-    score: 45,
-    value: "€12,000",
-    created: "2024-01-05",
-    nextAction: "Seguimiento en 3 meses"
-  }
-];
+interface Lead {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  company?: string;
+  source?: string;
+  status: string;
+  value?: number;
+  notes?: string;
+  created_at: string;
+}
+
+const leads = [];
 
 export default function Leads() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadLeads();
+  }, []);
+
+  const loadLeads = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('leads')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      setLeads(data || []);
+    } catch (error) {
+      console.error('Error loading leads:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredLeads = leads.filter(lead =>
     lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    lead.company.toLowerCase().includes(searchTerm.toLowerCase())
+    (lead.company && lead.company.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const getStatusColor = (status: string) => {
@@ -126,67 +110,90 @@ export default function Leads() {
 
       {/* Leads Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {filteredLeads.map((lead) => (
-          <Card key={lead.id} className="shadow-card hover:shadow-elevated transition-shadow">
-            <CardHeader className="pb-3">
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="text-lg">{lead.name}</CardTitle>
-                  <p className="text-sm text-muted-foreground">{lead.company}</p>
+        {loading ? (
+          // Loading skeleton
+          Array.from({ length: 6 }).map((_, index) => (
+            <Card key={index} className="shadow-card">
+              <CardHeader className="pb-3">
+                <div className="h-6 w-32 bg-muted animate-pulse rounded mb-2"></div>
+                <div className="h-4 w-24 bg-muted animate-pulse rounded"></div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="h-4 w-full bg-muted animate-pulse rounded"></div>
+                  <div className="h-4 w-3/4 bg-muted animate-pulse rounded"></div>
+                  <div className="h-4 w-1/2 bg-muted animate-pulse rounded"></div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Badge className={getStatusColor(lead.status)}>
-                    {lead.status}
-                  </Badge>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem>Ver detalles</DropdownMenuItem>
-                      <DropdownMenuItem>Editar lead</DropdownMenuItem>
-                      <DropdownMenuItem>Convertir a cliente</DropdownMenuItem>
-                      <DropdownMenuItem>Marcar como perdido</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          filteredLeads.map((lead) => (
+            <Card key={lead.id} className="shadow-card hover:shadow-elevated transition-shadow">
+              <CardHeader className="pb-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="text-lg">{lead.name}</CardTitle>
+                    {lead.company && (
+                      <p className="text-sm text-muted-foreground">{lead.company}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Badge className={getStatusColor(lead.status)}>
+                      {lead.status}
+                    </Badge>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem>Ver detalles</DropdownMenuItem>
+                        <DropdownMenuItem>Editar lead</DropdownMenuItem>
+                        <DropdownMenuItem>Convertir a cliente</DropdownMenuItem>
+                        <DropdownMenuItem>Marcar como perdido</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center text-sm text-muted-foreground">
-                <Mail className="mr-2 h-4 w-4" />
-                {lead.email}
-              </div>
-              <div className="flex items-center text-sm text-muted-foreground">
-                <Phone className="mr-2 h-4 w-4" />
-                {lead.phone}
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center text-sm text-muted-foreground">
-                  <TrendingUp className="mr-2 h-4 w-4" />
-                  Score: <span className={`ml-1 font-medium ${getScoreColor(lead.score)}`}>{lead.score}/100</span>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {lead.email && (
+                  <div className="flex items-center text-sm text-muted-foreground">
+                    <Mail className="mr-2 h-4 w-4" />
+                    {lead.email}
+                  </div>
+                )}
+                {lead.phone && (
+                  <div className="flex items-center text-sm text-muted-foreground">
+                    <Phone className="mr-2 h-4 w-4" />
+                    {lead.phone}
+                  </div>
+                )}
+                {lead.source && (
+                  <div className="text-sm text-muted-foreground">
+                    Fuente: {lead.source}
+                  </div>
+                )}
+                
+                <div className="pt-2 border-t border-border space-y-2">
+                  {lead.value && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium">Valor estimado</span>
+                      <span className="text-lg font-bold text-success">
+                        {lead.value.toLocaleString('es-ES')}€
+                      </span>
+                    </div>
+                  )}
+                  <div className="text-xs text-muted-foreground">
+                    Creado: {new Date(lead.created_at).toLocaleDateString()}
+                  </div>
                 </div>
-                <span className="text-sm text-muted-foreground">{lead.source}</span>
-              </div>
-              
-              <div className="pt-2 border-t border-border space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">Valor estimado</span>
-                  <span className="text-lg font-bold text-success">{lead.value}</span>
-                </div>
-                <div className="flex items-center text-sm text-muted-foreground">
-                  <Calendar className="mr-2 h-4 w-4" />
-                  {lead.nextAction}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Creado: {lead.created}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
 
       {/* Empty State */}
