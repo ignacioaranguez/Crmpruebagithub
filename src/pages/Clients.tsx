@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Search, Phone, Mail, MapPin, MoreHorizontal, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,72 +10,60 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { supabase } from "@/integrations/supabase/client";
 
-const clients = [
-  {
-    id: 1,
-    name: "María González",
-    company: "TechCorp S.L.",
-    email: "maria@techcorp.com",
-    phone: "+34 666 123 456",
-    location: "Madrid",
-    status: "activo",
-    value: "€15,000",
-    lastContact: "2024-01-10"
-  },
-  {
-    id: 2,
-    name: "Carlos Ruiz",
-    company: "Innovate Solutions",
-    email: "carlos@innovate.es",
-    phone: "+34 677 234 567",
-    location: "Barcelona",
-    status: "activo",
-    value: "€22,500",
-    lastContact: "2024-01-08"
-  },
-  {
-    id: 3,
-    name: "Ana Martín",
-    company: "Digital Hub",
-    email: "ana@digitalhub.com",
-    phone: "+34 688 345 678",
-    location: "Valencia",
-    status: "inactivo",
-    value: "€8,000",
-    lastContact: "2023-12-15"
-  },
-  {
-    id: 4,
-    name: "Pedro López",
-    company: "StartUp Pro",
-    email: "pedro@startuppro.es",
-    phone: "+34 699 456 789",
-    location: "Sevilla",
-    status: "prospecto",
-    value: "€30,000",
-    lastContact: "2024-01-12"
-  }
-];
+interface Client {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  company?: string;
+  address?: string;
+  status: string;
+  created_at: string;
+}
+
+const clients = [];
 
 export default function Clients() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadClients();
+  }, []);
+
+  const loadClients = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      setClients(data || []);
+    } catch (error) {
+      console.error('Error loading clients:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredClients = clients.filter(client =>
     client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.company.toLowerCase().includes(searchTerm.toLowerCase())
+    (client.company && client.company.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "activo":
+      case "active":
         return "bg-success/10 text-success hover:bg-success/20";
-      case "inactivo":
+      case "inactive":
         return "bg-muted text-muted-foreground hover:bg-muted/80";
-      case "prospecto":
-        return "bg-primary/10 text-primary hover:bg-primary/20";
       default:
-        return "bg-muted text-muted-foreground hover:bg-muted/80";
+        return "bg-primary/10 text-primary hover:bg-primary/20";
     }
   };
 
@@ -110,60 +98,85 @@ export default function Clients() {
 
       {/* Clients Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {filteredClients.map((client) => (
-          <Card key={client.id} className="shadow-card hover:shadow-elevated transition-shadow">
-            <CardHeader className="pb-3">
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="text-lg">{client.name}</CardTitle>
-                  <p className="text-sm text-muted-foreground">{client.company}</p>
+        {loading ? (
+          // Loading skeleton
+          Array.from({ length: 6 }).map((_, index) => (
+            <Card key={index} className="shadow-card">
+              <CardHeader className="pb-3">
+                <div className="h-6 w-32 bg-muted animate-pulse rounded mb-2"></div>
+                <div className="h-4 w-24 bg-muted animate-pulse rounded"></div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="h-4 w-full bg-muted animate-pulse rounded"></div>
+                  <div className="h-4 w-3/4 bg-muted animate-pulse rounded"></div>
+                  <div className="h-4 w-1/2 bg-muted animate-pulse rounded"></div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Badge className={getStatusColor(client.status)}>
-                    {client.status}
-                  </Badge>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem>Ver detalles</DropdownMenuItem>
-                      <DropdownMenuItem>Editar cliente</DropdownMenuItem>
-                      <DropdownMenuItem>Crear tarea</DropdownMenuItem>
-                      <DropdownMenuItem>Registrar actividad</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          filteredClients.map((client) => (
+            <Card key={client.id} className="shadow-card hover:shadow-elevated transition-shadow">
+              <CardHeader className="pb-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="text-lg">{client.name}</CardTitle>
+                    {client.company && (
+                      <p className="text-sm text-muted-foreground">{client.company}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Badge className={getStatusColor(client.status)}>
+                      {client.status === 'active' ? 'Activo' : 'Inactivo'}
+                    </Badge>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem>Ver detalles</DropdownMenuItem>
+                        <DropdownMenuItem>Editar cliente</DropdownMenuItem>
+                        <DropdownMenuItem>Crear tarea</DropdownMenuItem>
+                        <DropdownMenuItem>Registrar actividad</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center text-sm text-muted-foreground">
-                <Mail className="mr-2 h-4 w-4" />
-                {client.email}
-              </div>
-              <div className="flex items-center text-sm text-muted-foreground">
-                <Phone className="mr-2 h-4 w-4" />
-                {client.phone}
-              </div>
-              <div className="flex items-center text-sm text-muted-foreground">
-                <MapPin className="mr-2 h-4 w-4" />
-                {client.location}
-              </div>
-              <div className="pt-2 border-t border-border">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">Valor</span>
-                  <span className="text-lg font-bold text-success">{client.value}</span>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {client.email && (
+                  <div className="flex items-center text-sm text-muted-foreground">
+                    <Mail className="mr-2 h-4 w-4" />
+                    {client.email}
+                  </div>
+                )}
+                {client.phone && (
+                  <div className="flex items-center text-sm text-muted-foreground">
+                    <Phone className="mr-2 h-4 w-4" />
+                    {client.phone}
+                  </div>
+                )}
+                {client.address && (
+                  <div className="flex items-center text-sm text-muted-foreground">
+                    <MapPin className="mr-2 h-4 w-4" />
+                    {client.address}
+                  </div>
+                )}
+                <div className="pt-2 border-t border-border">
+                  <div className="flex justify-between items-center mt-1">
+                    <span className="text-xs text-muted-foreground">Creado</span>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(client.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center mt-1">
-                  <span className="text-xs text-muted-foreground">Último contacto</span>
-                  <span className="text-xs text-muted-foreground">{client.lastContact}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
 
       {/* Empty State */}
