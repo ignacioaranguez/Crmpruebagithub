@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 const navigation = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
+  { name: "Panel de Control", href: "/", icon: LayoutDashboard },
   { name: "Clientes", href: "/clients", icon: Users },
   { name: "Leads", href: "/leads", icon: UserPlus },
   { name: "Tareas", href: "/tasks", icon: CheckSquare },
@@ -113,7 +113,7 @@ export default function Layout({ children }: { children?: React.ReactNode }) {
           <div className="flex-1 px-4 flex justify-between items-center">
             <div className="flex-1 flex">
               <h1 className="text-2xl font-semibold text-gray-900">
-                {navigation.find(item => item.href === location.pathname)?.name || "Dashboard"}
+                {navigation.find(item => item.href === location.pathname)?.name || "Panel de Control"}
               </h1>
             </div>
           </div>
